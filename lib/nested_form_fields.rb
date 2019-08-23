@@ -11,7 +11,13 @@ module ActionView::Helpers
 
   class FormBuilder
 
+    # options:
+    #   include_template
+    #   custom_object_name
+    #   template_only
+    #   start_index
     def nested_fields_for(record_name, record_object = nil, fields_options = {}, &block)
+      
       fields_options, record_object = record_object, nil if record_object.is_a?(Hash) && record_object.extractable_options?
       fields_options[:builder] ||= options[:builder]
       fields_options[:parent_builder] = self
@@ -19,6 +25,16 @@ module ActionView::Helpers
       fields_options[:wrapper_options] ||= {}
       fields_options[:namespace] = fields_options[:parent_builder].options[:namespace]
 
+      # custom
+      # fields_options[:custom_name] ||= false
+
+      # options[:with_template] = true if options[:with_template].nil?
+
+      # options[:template_only] 
+      
+      # output = ActiveSupport::SafeBuffer.new
+      # output << @template.content_tag("")
+      
       return fields_for_has_many_association_with_template(record_name, record_object, fields_options, block)
     end
 
@@ -59,32 +75,70 @@ module ActionView::Helpers
     private
 
     def fields_for_has_many_association_with_template(association_name, association, options, block)
-      name = "#{object_name}[#{association_name}_attributes]"
-      association = convert_to_model(association)
 
-      if association.respond_to?(:persisted?)
+      # if custom name: name = association_name
+      # delivery_order[delivery_order_content_packages_attributes]
+      # TODO: options[:custom_object_name] true
+      # TODO: options[:index] number
+      # TODO: options[:start_index]
+      name = "#{options[:custom_object_name].clone || object_name}[#{association_name}_attributes]"
+      # if options[:custom_object_name] 
+      #   name = association_name
+      # end
+
+      ## File actionpack/lib/action_view/helpers/form_helper.rb, line 109
+      # def convert_to_model(object)
+      #   object.respond_to?(:to_model) ? object.to_model : object
+      # end
+      association = convert_to_model(association) # returns object for openstruct
+
+      # TODO: handle all relevant cases
+      # true for single model instance, should serve the same purpose as reflect on all associations
+      if association.respond_to?(:persisted?) || association.is_a?(OpenStruct)  
         association = [association]
-      elsif !association.respond_to?(:to_ary)
-        association = @object.send(association_name)
+      elsif not association.respond_to?(:to_ary)    # if it does not respond to to_ary
+        association = @object.send(association_name) # probably needs to go if single or openstruct, seems wrong in above case
+        # .respond_to?(:reflect_on_all_associations)
       end
+
+      # model, openstruct
+      # collections
+      # nil
+
+      Rails.logger.tagged("Fatality") {
+        Rails.logger.fatal "begin" 
+        Rails.logger.fatal "object_name: #{object_name}" # delivery_order
+        Rails.logger.fatal "custom_object_name: #{options[:custom_object_name].clone}"
+        Rails.logger.fatal "name: #{name}"               # see above
+        Rails.logger.fatal "object: #{object}"           # @delivery_order
+        Rails.logger.fatal "association_name: #{association_name}"  # custom string should probably be just the name, custom_string should become the object_name?
+        Rails.logger.fatal "association: #{association}"            # docp.first
+        Rails.logger.fatal "include_template: #{options[:include_template]}"
+        Rails.logger.fatal "end"
+      }
 
       output = ActiveSupport::SafeBuffer.new
-      association.each_with_index do |child, index|
-        wrapper_options = options[:wrapper_options].clone || {}
-        if child._destroy == true
-          wrapper_options[:style] = wrapper_options[:style] ? wrapper_options[:style] + ';' + 'display:none' : 'display:none'
-          output << destroy_hidden_field(association_name, index)
+      unless options[:template_only] 
+        association.each_with_index do |child, index|
+          index += options[:start_index].clone || 0 # start_index
+          # TODO: nested child index
+          Rails.logger.tagged("start_index") { Rails.logger.fatal options[:start_index] }
+          wrapper_options = options[:wrapper_options].clone || {}
+          if child._destroy == true # works for openstruct too
+            wrapper_options[:style] = wrapper_options[:style] ? wrapper_options[:style] + ';' + 'display:none' : 'display:none'
+            output << destroy_hidden_field(association_name, index)
+          end
+          
+          
+          # Build the wrapper + content and do substitution with the current index allows JS functions to have proper references
+          wrapped_block = nested_fields_wrapper(association_name, options[:wrapper_tag], options[:legend], wrapper_options) do
+            fields_for_nested_model("#{name}[#{options[:child_index] || nested_child_index(name)}]", child, options, block)
+          end
+          output << wrapped_block.gsub('__nested_field_for_replace_with_index__', index.to_s).html_safe
         end
-
-        # Build the wrapper + content and do substitution with the current index allows JS functions to have proper references
-        wrapped_block = nested_fields_wrapper(association_name, options[:wrapper_tag], options[:legend], wrapper_options) do
-          fields_for_nested_model("#{name}[#{options[:child_index] || nested_child_index(name)}]", child, options, block)
-        end
-        output << wrapped_block.gsub('__nested_field_for_replace_with_index__', index.to_s).html_safe
       end
-
-      output << nested_model_template(name, association_name, options, block)
-      output
+      output << nested_model_template(name, association_name, options, block) unless options[:include_template] == false
+      return output
     end
 
 
@@ -103,10 +157,9 @@ module ActionView::Helpers
                              class: for_template ? 'form_template' : nil,
                              style: for_template ? 'display:none' : nil ) do
         nested_fields_wrapper(association_name, options[:wrapper_tag], options[:legend], options[:wrapper_options]) do
-          association_class = (options[:class_name] || object.public_send(association_name).klass.name).to_s.classify.constantize
-          fields_for_nested_model("#{name}[#{index_placeholder(association_name)}]",
-                                   association_class.new,
-                                   options.merge(for_template: true), block)
+          # class name
+          association_class = (options[:class_name] || @object.public_send(association_name).klass.name).to_s.classify.constantize
+          fields_for_nested_model("#{name}[#{index_placeholder(association_name)}]", association_class.new, options.merge(for_template: true), block)
         end
       end
     end
@@ -116,7 +169,7 @@ module ActionView::Helpers
     end
 
     def association_path association_name
-      "#{object_name.to_s.gsub('][','_').gsub(/_attributes/,'').sub('[','_').sub(']','')}_#{association_name}"
+      "#{(options[:custom_object_name].clone || object_name).to_s.gsub('][','_').gsub(/_attributes/,'').sub('[','_').sub(']','')}_#{association_name}"
     end
 
     def index_placeholder association_name
@@ -124,18 +177,21 @@ module ActionView::Helpers
     end
 
     def delete_association_field_name
-      "#{object_name}[_destroy]"
+      "#{options[:custom_object_name].clone || object_name}[_destroy]"
     end
 
     def nested_fields_wrapper(association_name, wrapper_element_type, legend, wrapper_options)
+
       wrapper_options = add_default_classes_to_wrapper_options(association_name, wrapper_options.clone)
+
       @template.content_tag wrapper_element_type, wrapper_options do
-        (wrapper_element_type==:fieldset && !legend.nil?)? ( @template.content_tag(:legend, legend, class: "nested_fields") + yield ) : yield
+        (wrapper_element_type == :fieldset && !legend.nil?)? ( @template.content_tag(:legend, legend, class: "nested_fields") + yield ) : yield
       end
+
     end
 
     def destroy_hidden_field(association_name, index)
-      @template.hidden_field "#{object_name}[#{association_name}_attributes][#{index}]",
+      @template.hidden_field "#{options[:custom_object_name].clone || object_name}[#{association_name}_attributes][#{index}]",
                              :_destroy, value: 1
     end
 
