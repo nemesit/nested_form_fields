@@ -26,18 +26,19 @@ module ActionView::Helpers
       fields_options[:namespace] = fields_options[:parent_builder].options[:namespace]
 
       # custom
-      # fields_options[:custom_name] ||= false
-
-      # options[:with_template] = true if options[:with_template].nil?
-
-      # options[:template_only] 
+      # replaces __nested_field_for_replace_with_index__ inside block with index
       
+      options[:start_index]         # start index for __nested_field_for_replace_with_index__ substitution
+      options[:child_index]         # start index for children
+      options[:custom_object_name]  # custom name instead of object_name from parent form builder object
+      options[:include_template]    # render template
+      options[:template_only]       # render only template
+
       # output = ActiveSupport::SafeBuffer.new
       # output << @template.content_tag("")
       
       return fields_for_has_many_association_with_template(record_name, record_object, fields_options, block)
     end
-
 
     def add_nested_fields_link association, text = nil, html_options = {}, &block
       html_options, text = text, nil if block_given? && text.is_a?(Hash)
@@ -71,20 +72,12 @@ module ActionView::Helpers
       @template.link_to *args, &block
     end
 
-
     private
 
     def fields_for_has_many_association_with_template(association_name, association, options, block)
 
-      # if custom name: name = association_name
-      # delivery_order[delivery_order_content_packages_attributes]
-      # TODO: options[:custom_object_name] true
-      # TODO: options[:index] number
-      # TODO: options[:start_index]
+      # TODO: legend
       name = "#{options[:custom_object_name].clone || object_name}[#{association_name}_attributes]"
-      # if options[:custom_object_name] 
-      #   name = association_name
-      # end
 
       ## File actionpack/lib/action_view/helpers/form_helper.rb, line 109
       # def convert_to_model(object)
@@ -93,6 +86,10 @@ module ActionView::Helpers
       association = convert_to_model(association) # returns object for openstruct
 
       # TODO: handle all relevant cases
+      # model, openstruct
+      # collections
+      # nil
+
       # true for single model instance, should serve the same purpose as reflect on all associations
       if association.respond_to?(:persisted?) || association.is_a?(OpenStruct)  
         association = [association]
@@ -100,10 +97,6 @@ module ActionView::Helpers
         association = @object.send(association_name) # probably needs to go if single or openstruct, seems wrong in above case
         # .respond_to?(:reflect_on_all_associations)
       end
-
-      # model, openstruct
-      # collections
-      # nil
 
       Rails.logger.tagged("Fatality") {
         Rails.logger.fatal "begin" 
@@ -120,7 +113,7 @@ module ActionView::Helpers
       output = ActiveSupport::SafeBuffer.new
       unless options[:template_only] 
         association.each_with_index do |child, index|
-          index += options[:start_index].clone || 0 # start_index
+          index += options[:start_index].to_i # start_index, zero if nil
           # TODO: nested child index
           Rails.logger.tagged("start_index") { Rails.logger.fatal options[:start_index] }
           wrapper_options = options[:wrapper_options].clone || {}
@@ -129,10 +122,10 @@ module ActionView::Helpers
             output << destroy_hidden_field(association_name, index)
           end
           
-          
+          wtf = 7
           # Build the wrapper + content and do substitution with the current index allows JS functions to have proper references
           wrapped_block = nested_fields_wrapper(association_name, options[:wrapper_tag], options[:legend], wrapper_options) do
-            fields_for_nested_model("#{name}[#{options[:child_index] || nested_child_index(name)}]", child, options, block)
+            fields_for_nested_model("#{name}[#{nested_child_index(name) + options[:child_index].to_i}]", child, options, block)
           end
           output << wrapped_block.gsub('__nested_field_for_replace_with_index__', index.to_s).html_safe
         end
@@ -140,7 +133,6 @@ module ActionView::Helpers
       output << nested_model_template(name, association_name, options, block) unless options[:include_template] == false
       return output
     end
-
 
     def nested_model_template name, association_name, options, block
       for_template = self.options[:for_template]
