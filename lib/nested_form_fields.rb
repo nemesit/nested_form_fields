@@ -97,18 +97,19 @@ module ActionView::Helpers
         association = @object.send(association_name) # probably needs to go if single or openstruct, seems wrong in above case
         # .respond_to?(:reflect_on_all_associations)
       end
+      # TODO: handle nil case
 
-      Rails.logger.tagged("Fatality") {
-        Rails.logger.fatal "begin" 
-        Rails.logger.fatal "object_name: #{object_name}" # delivery_order
-        Rails.logger.fatal "custom_object_name: #{options[:custom_object_name].clone}"
-        Rails.logger.fatal "name: #{name}"               # see above
-        Rails.logger.fatal "object: #{object}"           # @delivery_order
-        Rails.logger.fatal "association_name: #{association_name}"  # custom string should probably be just the name, custom_string should become the object_name?
-        Rails.logger.fatal "association: #{association}"            # docp.first
-        Rails.logger.fatal "include_template: #{options[:include_template]}"
-        Rails.logger.fatal "end"
-      }
+      # Rails.logger.tagged("Fatality") {
+      #   Rails.logger.fatal "begin" 
+      #   Rails.logger.fatal "object_name: #{object_name}" # delivery_order
+      #   Rails.logger.fatal "custom_object_name: #{options[:custom_object_name].clone}"
+      #   Rails.logger.fatal "name: #{name}"               # see above
+      #   Rails.logger.fatal "object: #{object}"           # @delivery_order
+      #   Rails.logger.fatal "association_name: #{association_name}"  # custom string should probably be just the name, custom_string should become the object_name?
+      #   Rails.logger.fatal "association: #{association}"            # docp.first
+      #   Rails.logger.fatal "include_template: #{options[:include_template]}"
+      #   Rails.logger.fatal "end"
+      # }
 
       output = ActiveSupport::SafeBuffer.new
       unless options[:template_only] 
