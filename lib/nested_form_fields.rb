@@ -122,8 +122,7 @@ module ActionView::Helpers
             wrapper_options[:style] = wrapper_options[:style] ? wrapper_options[:style] + ';' + 'display:none' : 'display:none'
             output << destroy_hidden_field(association_name, index)
           end
-          
-          wtf = 7
+
           # Build the wrapper + content and do substitution with the current index allows JS functions to have proper references
           wrapped_block = nested_fields_wrapper(association_name, options[:wrapper_tag], options[:legend], wrapper_options) do
             fields_for_nested_model("#{name}[#{nested_child_index(name) + options[:child_index].to_i}]", child, options, block)
@@ -131,7 +130,7 @@ module ActionView::Helpers
           output << wrapped_block.gsub('__nested_field_for_replace_with_index__', index.to_s).html_safe
         end
       end
-      output << nested_model_template(name, association_name, options, block) unless options[:include_template] == false
+      output << nested_model_template(name, association_name, options, block).gsub('__nested_field_for_replace_with_index__', index_placeholder(association_name)).html_safe unless options[:include_template] == false
       return output
     end
 
@@ -144,7 +143,9 @@ module ActionView::Helpers
       # the outermost nested templates div's are replaced by script tags to prevent those nested templates
       # fields from form subission.
       #
-      @template.content_tag( for_template ? :div : :script,
+      Rails.logger.tagged("edited nested form fields ") { Rails.logger.fatal "template" } 
+
+      @template.content_tag(for_template ? :div : :template,
                              type: for_template ? nil : 'text/html',
                              id: template_id(association_name),
                              class: for_template ? 'form_template' : nil,
