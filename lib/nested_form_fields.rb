@@ -116,7 +116,7 @@ module ActionView::Helpers
         association.each_with_index do |child, index|
           index += options[:start_index].to_i # start_index, zero if nil
           # TODO: nested child index
-          Rails.logger.tagged("start_index") { Rails.logger.fatal options[:start_index] }
+          # Rails.logger.tagged("start_index") { Rails.logger.fatal options[:start_index] }
           wrapper_options = options[:wrapper_options].clone || {}
           if child._destroy == true # works for openstruct too
             wrapper_options[:style] = wrapper_options[:style] ? wrapper_options[:style] + ';' + 'display:none' : 'display:none'
@@ -143,7 +143,7 @@ module ActionView::Helpers
       # the outermost nested templates div's are replaced by script tags to prevent those nested templates
       # fields from form subission.
       #
-      Rails.logger.tagged("edited nested form fields ") { Rails.logger.fatal "template" } 
+      # Rails.logger.tagged("edited nested form fields ") { Rails.logger.fatal "template" } 
 
       @template.content_tag(for_template ? :div : :template,
                              type: for_template ? nil : 'text/html',

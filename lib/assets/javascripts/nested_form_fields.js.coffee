@@ -6,7 +6,10 @@ nested_form_fields.bind_nested_forms_links = () ->
     $link = $(this)
     object_class = $link.data('object-class')
     association_path = $link.data('association-path')
-    added_index = $(".nested_#{association_path}").length
+    association_insert_into = $link.data('insert-into')
+    last_index = $("##{association_insert_into}").data('last_nested_field_index') || $(".nested_#{association_path}").length - 1
+    added_index = last_index += 1
+    $("##{association_insert_into}").data('last_nested_field_index', added_index)
     $.event.trigger("fields_adding.nested_form_fields",{object_class: object_class, added_index: added_index, association_path: association_path, additional_data: additional_data});
     if $link.data('scope')
       $template = $("#{$link.data('scope')} ##{association_path}_template")
